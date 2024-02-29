@@ -85,8 +85,8 @@ def challenge1b():
 
     # rho_num_bins = ??;
     # theta_num_bins = ??;
-    rho_num_bins = 200  # hypotenuse of 640x480 imgs = 800
-    theta_num_bins = 90
+    rho_num_bins = 1800  
+    theta_num_bins = 360
 
     for i, fn in enumerate(img_list):
         # Load the edge image from challenge1a
@@ -105,7 +105,7 @@ def challenge1c():
 
     img_list = ['hough_1.png', 'hough_2.png', 'hough_3.png']
 
-    hough_threshold = [115, 53.8, 60]
+    hough_threshold = [120, 68, 52]
 
     for i, fn in enumerate(img_list):
         orig_img = Image.open(f"data/{fn}")
