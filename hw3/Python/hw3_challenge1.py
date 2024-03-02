@@ -87,31 +87,35 @@ def lineSegmentFinder(orig_img: np.ndarray, edge_img: np.ndarray, hough_img: np.
     nrow, ncol = orig_img.shape
     diag_len = np.sqrt(nrow**2 + ncol**2)
 
+    R = 5
+
     for i, j in zip(*hough_peaks):
+        print(f"({i}, {j})")
         theta = i * np.pi/theta_num_bins
         rho = -diag_len + j * (2 * diag_len/rho_num_bins)
         xp0 = 0 
         while xp0 < nrow:
-            yp0 = (rho + xp0 * np.sin(theta))/np.cos(theta)
+            yp0 = int((rho + xp0 * np.sin(theta))/np.cos(theta))
             xp1 = xp0
             flag_start = False    # flag for starting point
             # check if (xp0, yp0) is a starting point 
-            for k in range(-2, 2):
-                for l in range(-2, 2):
+            for k in range(-R, R + 1):
+                for l in range(-R, R + 1):
                     xp = xp0 + k; yp = yp0 + l
-                    if xp >=0 and xp < nrow and yp >= 0 and yp < ncol and edge_img[xp, yp] > 0:
-                        flag_start = True
-                        break
+                    if xp >=0 and xp < nrow and yp >= 0 and yp < ncol:
+                        if edge_img[xp, yp] > 0:
+                            flag_start = True
+                            break
             if flag_start:
                 # (xp0, yp0) is a starting point
                 # search for ending point
-                xp += 1
+                xp1 += 1
                 while xp1 < nrow:
-                    yp1 = (rho + xp1 * np.sin(theta))/np.cos(theta)
+                    yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
                     flag_end = True    # flag for ending point
                     # check if (xp1, yp1) is a ending point 
-                    for k in range(-2, 2):
-                        for l in range(-2, 2):
+                    for k in range(-R, R + 1):
+                        for l in range(-R, R + 1):
                             xp = xp1 + k; yp = yp1 + l
                             if xp >=0 and xp < nrow and yp >= 0 and yp < ncol and edge_img[xp, yp] > 0:
                                 flag_end = False
@@ -119,15 +123,18 @@ def lineSegmentFinder(orig_img: np.ndarray, edge_img: np.ndarray, hough_img: np.
                     if flag_end:
                         break
                     else:
-                        xp += 1
+                        xp1 += 1
 
                 # draw a line segment
                 xp1 -= 1
-                yp1 = (rho + xp1 * np.sin(theta))/np.cos(theta)
+                yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
                 draw.line((yp0, xp0, yp1, xp1), fill=128, width=5)
+                
+                print("A line is drawn!")
 
             # move on
             xp0 = xp1 + 1
+
         
     line_segment_image.show()
     return  line_segment_image
