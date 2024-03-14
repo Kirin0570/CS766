@@ -87,53 +87,92 @@ def lineSegmentFinder(orig_img: np.ndarray, edge_img: np.ndarray, hough_img: np.
     nrow, ncol = orig_img.shape
     diag_len = np.sqrt(nrow**2 + ncol**2)
 
-    R = 5
+    R = 3
 
     for i, j in zip(*hough_peaks):
-        print(f"({i}, {j})")
         theta = i * np.pi/theta_num_bins
         rho = -diag_len + j * (2 * diag_len/rho_num_bins)
         xp0 = 0 
-        while xp0 < nrow:
-            yp0 = int((rho + xp0 * np.sin(theta))/np.cos(theta))
-            xp1 = xp0
-            flag_start = False    # flag for starting point
-            # check if (xp0, yp0) is a starting point 
-            for k in range(-R, R + 1):
-                for l in range(-R, R + 1):
-                    xp = xp0 + k; yp = yp0 + l
-                    if xp >=0 and xp < nrow and yp >= 0 and yp < ncol:
-                        if edge_img[xp, yp] > 0:
-                            flag_start = True
-                            break
-            if flag_start:
-                # (xp0, yp0) is a starting point
-                # search for ending point
-                xp1 += 1
-                while xp1 < nrow:
-                    yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
-                    flag_end = True    # flag for ending point
-                    # check if (xp1, yp1) is a ending point 
-                    for k in range(-R, R + 1):
-                        for l in range(-R, R + 1):
-                            xp = xp1 + k; yp = yp1 + l
-                            if xp >=0 and xp < nrow and yp >= 0 and yp < ncol and edge_img[xp, yp] > 0:
-                                flag_end = False
+        yp0 = int((rho + xp0 * np.sin(theta))/np.cos(theta))
+        if yp0 >= 0 and yp0 < ncol:
+            while xp0 < nrow:
+                yp0 = int((rho + xp0 * np.sin(theta))/np.cos(theta))
+                xp1 = xp0
+                flag_start = False    # flag for starting point
+                # check if (xp0, yp0) is a starting point 
+                for k in range(-R, R + 1):
+                    for l in range(-R, R + 1):
+                        xp = xp0 + k; yp = yp0 + l
+                        if xp >=0 and xp < nrow and yp >= 0 and yp < ncol:
+                            if edge_img[xp, yp] > 0:
+                                flag_start = True
                                 break
-                    if flag_end:
-                        break
-                    else:
-                        xp1 += 1
+                if flag_start:
+                    # (xp0, yp0) is a starting point
+                    # search for ending point
+                    xp1 += 1
+                    while xp1 < nrow:
+                        yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
+                        flag_end = True    # flag for ending point
+                        # check if (xp1, yp1) is a ending point 
+                        for k in range(-R, R + 1):
+                            for l in range(-R, R + 1):
+                                xp = xp1 + k; yp = yp1 + l
+                                if xp >=0 and xp < nrow and yp >= 0 and yp < ncol and edge_img[xp, yp] > 0:
+                                    flag_end = False
+                                    break
+                        if flag_end:
+                            break
+                        else:
+                            xp1 += 1
 
-                # draw a line segment
-                xp1 -= 1
-                yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
-                draw.line((yp0, xp0, yp1, xp1), fill=128, width=5)
-                
-                print("A line is drawn!")
+                    # draw a line segment
+                    xp1 -= 1
+                    yp1 = int((rho + xp1 * np.sin(theta))/np.cos(theta))
+                    draw.line((yp0, xp0, yp1, xp1), fill=128, width=5)
 
-            # move on
-            xp0 = xp1 + 1
+                # move on
+                xp0 = xp1 + 1
+        else:
+            yp0 = 0
+            while yp0 < ncol:
+                xp0 = int((yp0 * np.cos(theta) - rho)/np.sin(theta))
+                yp1 = yp0
+                flag_start = False    # flag for starting point
+                # check if (xp0, yp0) is a starting point 
+                for k in range(-R, R + 1):
+                    for l in range(-R, R + 1):
+                        xp = xp0 + k; yp = yp0 + l
+                        if xp >=0 and xp < nrow and yp >= 0 and yp < ncol:
+                            if edge_img[xp, yp] > 0:
+                                flag_start = True
+                                break
+                if flag_start:
+                    # (xp0, yp0) is a starting point
+                    # search for ending point
+                    yp1 += 1
+                    while yp1 < ncol:
+                        xp1 = int((yp1 * np.cos(theta) - rho)/np.sin(theta))
+                        flag_end = True    # flag for ending point
+                        # check if (xp1, yp1) is a ending point 
+                        for k in range(-R, R + 1):
+                            for l in range(-R, R + 1):
+                                xp = xp1 + k; yp = yp1 + l
+                                if xp >=0 and xp < nrow and yp >= 0 and yp < ncol and edge_img[xp, yp] > 0:
+                                    flag_end = False
+                                    break
+                        if flag_end:
+                            break
+                        else:
+                            yp1 += 1
+
+                    # draw a line segment
+                    yp1 -= 1
+                    xp1 = int((yp1 * np.cos(theta) - rho)/np.sin(theta))
+                    draw.line((yp0, xp0, yp1, xp1), fill=128, width=5)
+
+                # move on
+                yp0 = yp1 + 1
 
         
     line_segment_image.show()
