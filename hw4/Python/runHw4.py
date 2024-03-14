@@ -94,7 +94,6 @@ def challenge1a():
     result_img = showCorrespondence(orig_img, warped_img, test_pts_nx2, np.array(dest_pts_nx2))
 
     # Save the result image
-    #result_img = Image.fromarray(result_img.astype(np.uint8))
     result_img.save('outputs/homography_result.png')
 
 
@@ -142,12 +141,18 @@ def challenge1c():
 
     xs, xd = genSIFTMatches(img_src, img_dst)
     # xs and xd are the centers of matched frames
-    # xs and xd are nx2 matrices, where the first column contains the x
-    # coordinates and the second column contains the y coordinates
+    # xs and xd are nx2 matrices, where the first column contains the x (row index)
+    # coordinates and the second column contains the y coordinates (col index)
+
+    # Reorder the columns
+    # The columns switched 
+    # since the definition of (x,y) in genSIFTMatches and showCorrespondence are different.
+    reordered_xs = xs[:, [1, 0]]
+    reordered_xd = xd[:, [1, 0]]
+
 
     # Assuming showCorrespondence is a function defined elsewhere in your code
-    before_img = showCorrespondence(img_src, img_dst, xs, xd)
-    before_img = Image.fromarray((before_img * 255).astype(np.uint8))
+    before_img = showCorrespondence(img_src, img_dst, reordered_xs, reordered_xd) 
     before_img.save('outputs/before_ransac.png')
 
     plt.figure()
@@ -156,13 +161,12 @@ def challenge1c():
     plt.show()
 
     # Use RANSAC to reject outliers
-    # ransac_n = ??  # Max number of iterations
-    # ransac_eps = ??  # Acceptable alignment error 
+    ransac_n = 30  # Max number of iterations
+    ransac_eps = 30  # Acceptable alignment error 
 
     # Assuming runRANSAC is a function defined elsewhere in your code
     inliers_id, _ = runRANSAC(xs, xd, ransac_n, ransac_eps)
-    after_img = showCorrespondence(img_src, img_dst, xs[inliers_id, :], xd[inliers_id, :])
-    after_img = Image.fromarray((after_img * 255).astype(np.uint8))
+    after_img = showCorrespondence(img_src, img_dst, reordered_xs[inliers_id, :], reordered_xd[inliers_id, :])
     after_img.save('outputs/after_ransac.png')
 
     plt.figure()

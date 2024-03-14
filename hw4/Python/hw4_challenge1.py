@@ -104,7 +104,7 @@ def applyHomography(H_3x3: np.ndarray, src_pts_nx2: np.ndarray) ->  np.ndarray:
     return dest_pts_nx2
 
 
-def showCorrespondence(img1: Image.Image, img2: Image.Image, pts1_nx2: np.ndarray, pts2_nx2: np.ndarray) -> Image.Image:
+def showCorrespondence(img1: np.ndarray, img2: np.ndarray, pts1_nx2: np.ndarray, pts2_nx2: np.ndarray) -> Image.Image:
     '''
     Show the correspondences between the two images.
     Arguments:
@@ -131,7 +131,7 @@ def showCorrespondence(img1: Image.Image, img2: Image.Image, pts1_nx2: np.ndarra
     draw = ImageDraw.Draw(result)
 
     # Draw lines between corresponding points
-    for (x1, y1), (x2, y2) in zip(pts1_nx2, pts2_nx2):
+    for (x1, y1), (x2, y2) in zip(pts1_nx2, pts2_nx2):  # x: col index    y: row index
         # Adjust the x-coordinate of points in the second image
         x2_adj = x2 + img1_pil.width
         draw.line((x1, y1, x2_adj, y2), fill=(255, 0, 0), width=2)
@@ -140,7 +140,7 @@ def showCorrespondence(img1: Image.Image, img2: Image.Image, pts1_nx2: np.ndarra
 
 # function [mask, result_img] = backwardWarpImg(src_img, resultToSrc_H, dest_canvas_width_height)
 
-def backwardWarpImg(src_img: Image.Image, destToSrc_H: np.ndarray, canvas_shape: Union[Tuple, List]) -> Tuple[Image.Image, Image.Image]:
+def backwardWarpImg(src_img: np.ndarray, destToSrc_H: np.ndarray, canvas_shape: Union[Tuple, List]) -> Tuple[Image.Image, Image.Image]:
     '''
     Backward warp the source image to the destination canvas based on the
     homography given by destToSrc_H. 
@@ -175,19 +175,47 @@ def backwardWarpImg(src_img: Image.Image, destToSrc_H: np.ndarray, canvas_shape:
     return dest_mask, dest_img
 
 
-def blendImagePair(img1: List[Image.Image], mask1: List[Image.Image], img2: Image.Image, mask2: Image.Image, mode: str) -> Image.Image:
+def blendImagePair(img1: np.ndarray, mask1: np.ndarray, img2: np.ndarray, mask2: np.ndarray, mode: str) -> np.ndarray:
     '''
-    Blend the warped images based on the masks.
+    Blend the images based on the masks without altering the original images.
     Arguments:
-        img1: list of source images.
-        mask1: list of source masks.
-        img2: destination image.
-        mask2: destination mask.
-        mode: either 'overlay' or 'blend'
+        img1: Source image as a NumPy array (RGB).
+        mask1: Source mask as a NumPy array (single channel).
+        img2: Destination image as a NumPy array (RGB).
+        mask2: Destination mask as a NumPy array (single channel).
+        mode: Either 'overlay' or 'blend'.
     Returns:
-        out_img: blended image.
+        out_img: Blended image as a NumPy array (RGB).
     '''
-    raise NotImplementedError
+    
+    # Create a copy of img1 to ensure the original is not modified
+    out_img = np.copy(img1)
+
+    # Ensure masks are boolean arrays
+    mask1_bool = mask1 > 0
+    mask2_bool = mask2 > 0
+
+    if mode == 'overlay':
+        # For overlay, directly copy pixels from img2 to the copy of img1 where mask2 applies
+        out_img[mask2_bool] = img2[mask2_bool]
+    elif mode == 'blend':
+        # For blending, calculate the blend where both masks are positive
+        both_masks = mask1_bool & mask2_bool
+        only_mask1 = mask1_bool & ~mask2_bool
+        only_mask2 = mask2_bool & ~mask1_bool
+        
+        # No need to initialize out_img with zeros since it's already a copy of img1
+        out_img[both_masks] = (out_img[both_masks].astype('float') + img2[both_masks].astype('float')) / 2
+        # The following lines are not needed since out_img is already img1 where only mask1 applies
+        # out_img[only_mask1] = out_img[only_mask1]
+        out_img[only_mask2] = img2[only_mask2]
+    else:
+        raise ValueError("Invalid blending mode. Choose either 'overlay' or 'blend'.")
+
+    return out_img
+
+
+
 
 def runRANSAC(src_pt: np.ndarray, dest_pt: np.ndarray, ransac_n: int, eps: float) -> Tuple[np.ndarray, np.ndarray]:
     '''
@@ -202,7 +230,38 @@ def runRANSAC(src_pt: np.ndarray, dest_pt: np.ndarray, ransac_n: int, eps: float
         inliers_id: the indices of the inliers (kx1 numpy array).
         H: the homography matrix (3x3 numpy array).
     '''
-    raise NotImplementedError
+
+    best_inliers_id = []
+    best_H = None
+    num_points = src_pt.shape[0]
+
+    for _ in range(ransac_n):
+        # Randomly select 4 points
+        indices = np.random.choice(num_points, 4, replace=False)
+        src_sample = src_pt[indices]
+        dest_sample = dest_pt[indices]
+
+        # Estimate homography
+        H = computeHomography(src_sample, dest_sample)
+
+        # Transform src_pt to dest plane
+        transformed_pts = applyHomography(H, src_pt)
+
+        # Calculate distances
+        differences = transformed_pts - dest_pt
+        distances = np.sqrt(np.sum(differences**2, axis=1))
+
+        # Determine inliers
+        inliers_id = np.where(distances < eps)[0]
+
+        if len(inliers_id) > len(best_inliers_id):
+            best_inliers_id = inliers_id
+            best_H = H
+
+    return best_inliers_id, best_H
+    
+
+
 
 def stitchImg(*args: Image.Image) -> Image.Image:
     '''
