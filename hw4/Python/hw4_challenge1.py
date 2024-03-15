@@ -204,10 +204,33 @@ def blendImagePair(img1: np.ndarray, mask1: np.ndarray, img2: np.ndarray, mask2:
         only_mask1 = mask1_bool & ~mask2_bool
         only_mask2 = mask2_bool & ~mask1_bool
         
-        # No need to initialize out_img with zeros since it's already a copy of img1
-        out_img[both_masks] = (out_img[both_masks].astype('float') + img2[both_masks].astype('float')) / 2
-        # The following lines are not needed since out_img is already img1 where only mask1 applies
-        # out_img[only_mask1] = out_img[only_mask1]
+        height, width = out_img.shape[:2]
+
+        # Calculate the indices where the blending will occur (both masks are positive)
+        blend_indices = np.where(both_masks)
+
+        # Create a gradient mask
+        gradient_mask = np.zeros(both_masks.shape, dtype='float')
+
+        # You'll need to adjust this part according to the direction of your blend (horizontal or vertical)
+        # This example assumes a horizontal blend. For a vertical blend, use the row indices (blend_indices[0]) instead
+        start = np.min(blend_indices[1])  # Start of the blend region
+        end = np.max(blend_indices[1])    # End of the blend region
+        for i in range(start, end + 1):
+            gradient_mask[:, i] = (i - start) / (end - start)
+
+        # Apply the gradient mask for blending
+        # Ensure dimensions match for broadcasting; you might need to adjust this part depending on your image structure
+        if out_img.ndim == 3 and gradient_mask.ndim == 2:
+            gradient_mask = gradient_mask[:, :, np.newaxis]
+
+        # Blend using the gradient mask where both masks overlap
+        out_img[both_masks] = out_img[both_masks].astype('float') * (1 - gradient_mask[both_masks]) + img2[both_masks].astype('float') * gradient_mask[both_masks]
+
+        # Normalize back to the original image type if necessary, e.g., uint8
+        out_img = np.clip(out_img, 0, 255).astype('uint8')
+
+        #out_img[both_masks] = (out_img[both_masks].astype('float') + img2[both_masks].astype('float')) / 2
         out_img[only_mask2] = img2[only_mask2]
     else:
         raise ValueError("Invalid blending mode. Choose either 'overlay' or 'blend'.")
@@ -366,7 +389,10 @@ def stitchOneMore(currentBase: np.ndarray, leftToCB: np.ndarray, rightToCB: np.n
     NBToSrc = dstToSrc @ CBToDst @ NBToCB
     mask1, dest_img = backwardWarpImg(img_src, NBToSrc, dest_canvas_shape)
     # Superimpose the image
-    result = blendImagePair(dest_img, mask1, new_base, mask2, "blend")
+    if left:
+        result = blendImagePair(dest_img, mask1, new_base, mask2, "blend")
+    else:
+        result = blendImagePair(new_base, mask2, dest_img, mask1, "blend")
     result = Image.fromarray((result).astype(np.uint8))
 
     leftToNB = leftToCB @ np.linalg.inv(NBToCB)
