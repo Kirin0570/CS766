@@ -203,15 +203,15 @@ def challenge1d():
 def challenge1e():
     from hw4_challenge1 import stitchImg
     # stitch three images
-    img_center = np.array(Image.open('data/mountain_center.png')) / 255.0
-    img_left = np.array(Image.open('data/mountain_left.png')) / 255.0
-    img_right = np.array(Image.open('data/mountain_right.png')) / 255.0
+    img_center = np.array(Image.open('data/mountain_center.png'))
+    img_left = np.array(Image.open('data/mountain_left.png'))
+    img_right = np.array(Image.open('data/mountain_right.png'))
 
     # You are free to change the order of input arguments
-    stitched_img = stitchImg(img_center, img_left, img_right)
+    stitched_img = stitchImg(img_left, img_center, img_right)
 
     # Save the stitched image
-    stitched_img = Image.fromarray((stitched_img * 255).astype(np.uint8))
+    stitched_img = Image.fromarray(stitched_img)
     stitched_img.save('outputs/stitched_img.png')
 
 # Test image stitching

@@ -263,7 +263,7 @@ def runRANSAC(src_pt: np.ndarray, dest_pt: np.ndarray, ransac_n: int, eps: float
 
 
 
-def stitchImg(*args: Image.Image) -> Image.Image:
+def stitchImg(*args: np.ndarray) -> np.ndarray:
     '''
     Stitch a list of images.
     Arguments:
@@ -271,4 +271,110 @@ def stitchImg(*args: Image.Image) -> Image.Image:
     Returns:
         stitched_img: the stitched image.
     '''
-    raise NotImplementedError
+    center = int(len(args)/2)
+    NB = np.array(args[center])
+    leftToNB = np.eye(3)
+    rightToNB = np.eye(3)
+
+    for dev in range(1, center + 1):
+        i = center - dev
+        NB, leftToNB, rightToNB = stitchOneMore(currentBase = NB, leftToCB = leftToNB, rightToCB = rightToNB, img_dst = args[i + 1], img_src = args[i], left = True)
+        i = center + dev
+        if i < len(args):
+            NB, leftToNB, rightToNB = stitchOneMore(currentBase = NB, leftToCB = leftToNB, rightToCB = rightToNB, img_dst = args[i - 1], img_src = args[i], left = False)
+    
+    return NB
+
+
+
+
+
+
+def stitchOneMore(currentBase: np.ndarray, leftToCB: np.ndarray, rightToCB: np.ndarray, img_dst: np.ndarray, img_src: np.ndarray, left: bool):
+    '''
+    Stitch one more image.
+    Arguments:
+        currentBase: current base image (CB).
+        leftToCB: the homography of the left-most stitched image to CB.
+        rightToCB: the homography of the left-most stitched image to CB.
+        img_dst: neighbor to img_src.
+        img_src: image to be stitched.
+        left: stitch on the left end or not.
+
+    Returns:
+        result: the stitched image.
+    '''
+    if left:
+        dstToCB = leftToCB
+    else:
+        dstToCB = rightToCB
+    from helpers import genSIFTMatches
+    from hw4_challenge1 import showCorrespondence, runRANSAC
+
+    xs, xd = genSIFTMatches(img_src, img_dst)
+
+    reordered_xs = xs[:, [1, 0]]
+    reordered_xd = xd[:, [1, 0]]
+
+    # Use RANSAC to reject outliers
+    ransac_n = 30  # Max number of iterations
+    ransac_eps = 1  # Acceptable alignment error 
+
+    inliers_id, _ = runRANSAC(xs, xd, ransac_n, ransac_eps)
+    src_pts = reordered_xs[inliers_id, :]
+    dest_pts = reordered_xd[inliers_id, :]
+
+
+    # Copy from challenge1a
+    from hw4_challenge1 import computeHomography, applyHomography, backwardWarpImg, blendImagePair
+    srcToDst = computeHomography(np.array(src_pts), np.array(dest_pts))
+    srcToCB = np.dot(dstToCB, srcToDst)
+
+    # Compute the size of the new base image
+    height, width = img_src.shape[:2]
+    corners_src = np.array([[0, 0], [0, height - 1], [width - 1, 0], [width - 1, height - 1]])
+    cornersInCB = applyHomography(srcToCB, corners_src)
+
+    left_boundary = min(cornersInCB[:, 0])
+    left_boundary = min(left_boundary, 0)
+    left_boundary = int(np.floor(left_boundary))
+
+    right_boundary = max(cornersInCB[:, 0])
+    right_boundary = max(right_boundary, currentBase.shape[1])
+    right_boundary = int(np.ceil(right_boundary))
+
+    top_boundary = min(cornersInCB[:, 1])
+    top_boundary = min(top_boundary, 0)
+    top_boundary = int(np.floor(top_boundary))
+
+    bottom_boundary = max(cornersInCB[:, 1])
+    bottom_boundary = max(bottom_boundary, currentBase.shape[0])
+    bottom_boundary = int(np.ceil(bottom_boundary))
+
+
+    new_base = np.zeros((bottom_boundary - top_boundary, right_boundary - left_boundary, 3))
+    # Place currentBase
+    new_base[(- top_boundary):(- top_boundary + currentBase.shape[0]), (- left_boundary):(- left_boundary + currentBase.shape[1])] = currentBase
+    mask2 = np.any(new_base > 0, axis=2)
+
+    # Place img_src
+    # Copy from challenge 1b
+    dest_canvas_shape = new_base.shape[:2]
+    NBToCB = np.array([[1, 0, left_boundary], [0, 1, top_boundary], [0, 0, 1]])
+    CBToDst = np.linalg.inv(dstToCB)
+    dstToSrc = np.linalg.inv(srcToDst)
+    NBToSrc = dstToSrc @ CBToDst @ NBToCB
+    mask1, dest_img = backwardWarpImg(img_src, NBToSrc, dest_canvas_shape)
+    # Superimpose the image
+    result = blendImagePair(dest_img, mask1, new_base, mask2, "blend")
+    result = Image.fromarray((result).astype(np.uint8))
+
+    leftToNB = leftToCB @ np.linalg.inv(NBToCB)
+    rightToNB = rightToCB @ np.linalg.inv(NBToCB)
+
+    return np.array(result), leftToNB, rightToNB
+
+
+
+
+
